@@ -88,6 +88,7 @@ export function ConsolePage() {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }
 
+  const accessToken = process.env.REACT_APP_API_ACCESS_TOKEN || '';
   /**
    * Instantiate:
    * - WavRecorder (speech input)
@@ -460,8 +461,6 @@ export function ConsolePage() {
       },
       async ({ date }: any) => {
         try {
-          const accessToken = process.env.REACT_APP_API_ACCESS_TOKEN || '';
-
           const [year, month, day] = date.split('-');
           const formattedDate = `${day}/${month}/${year}`;
 
@@ -533,13 +532,25 @@ export function ConsolePage() {
       {
         name: 'extract_user_data',
         description:
-          'Extract user data for blood test booking, including username, booking date, timeslot, additional notes, and transcriptions of the conversation.',
+          'Extract user data for blood test booking, including username, phone_number, email, booking date, booking_timeslot as From [from_time] AM or PM to [to_time] AM or PM, slot_id(id taken from user selected timeslot), additional notes, and transcriptions of the conversation.',
         parameters: {
           type: 'object',
           properties: {
             username: {
               type: 'string',
               description: "The user's full name",
+            },
+            phone_number: {
+              type: 'string',
+              description: "The user's phone number",
+            },
+            email: {
+              type: 'string',
+              description: "The user's Email ID",
+            },
+            slot_id: {
+              type: 'string',
+              description: 'slot_id(id taken from user selected timeslot)',
             },
             booking_date: {
               type: 'string',
@@ -549,7 +560,7 @@ export function ConsolePage() {
             booking_timeslot: {
               type: 'string',
               description:
-                'Preferred timeslot for the blood test ([from_time] to [to_time] format: HH:MM)',
+                'Preferred timeslot for the blood test From [from_time] AM or PM to [to_time] AM or PM',
             },
             additional_notes: {
               type: 'string',
@@ -567,8 +578,12 @@ export function ConsolePage() {
           },
           required: [
             'username',
+            'phone_number',
+            'email',
+            'slot_id',
             'booking_date',
             'booking_timeslot',
+            'additional_notes',
             'user_transcription',
             'assistant_transcription',
           ],
@@ -576,6 +591,7 @@ export function ConsolePage() {
       },
       async ({
         username,
+        slot_id,
         booking_date,
         booking_timeslot,
         additional_notes,
@@ -585,21 +601,25 @@ export function ConsolePage() {
         [key: string]: any;
       }) => {
         const userData = {
-          username: username,
+          name: username,
           booking_date: booking_date,
-          booking_timeslot: booking_timeslot,
-          additional_notes: additional_notes || '',
+          slot_id: slot_id,
+          booking_time: booking_timeslot,
+          notes: additional_notes || '',
           user_transcription: user_transcription,
           assistant_transcription: assistant_transcription,
         };
 
         try {
           const response = await axios.post(
-            'http://localhost:3000/api/bookings',
-            userData
+            'https://sea-turtle-app-fv68w.ondigitalocean.app/api/v1/voice-bookings',
+            userData,
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            }
           );
-          console.log('Data saved successfully:', response.data);
-
           // Return success response
           return { ok: true };
         } catch (error) {
