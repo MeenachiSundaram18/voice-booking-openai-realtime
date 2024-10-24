@@ -8,6 +8,7 @@
  * This will also require you to set OPENAI_API_KEY= in a `.env` file
  * You can run it with `npm run relay`, in parallel with `npm start`
  */
+
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
@@ -406,113 +407,20 @@ export function ConsolePage() {
     // Set transcription, otherwise we don't get user transcriptions back
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
-    // Add tools
-    // client.addTool(
-    //   {
-    //     name: 'set_memory',
-    //     description: 'Saves important data about the user into memory.',
-    //     parameters: {
-    //       type: 'object',
-    //       properties: {
-    //         key: {
-    //           type: 'string',
-    //           description:
-    //             'The key of the memory value. Always use lowercase and underscores, no other characters.',
-    //         },
-    //         value: {
-    //           type: 'string',
-    //           description: 'Value can be anything represented as a string',
-    //         },
-    //       },
-    //       required: ['key', 'value'],
-    //     },
-    //   },
-    //   async ({ key, value }: { [key: string]: any }) => {
-    //     setMemoryKv((memoryKv) => {
-    //       const newKv = { ...memoryKv };
-    //       newKv[key] = value;
-    //       return newKv;
-    //     });
-    //     return { ok: true };
-    //   }
-    // );
+    function getNextFiveDays() {
+      const daysArray = [];
+      const today = new Date();
 
-    // async function getAvailableTimeSlots() {
-    //   try {
-    //     // Call the API to fetch the available time slots for the date
-    //     // const response = await axios.get(
-    //     //   'http://localhost:3000/getAvailableTimeSlots',
-    //     //   {
-    //     //     params: { date },
-    //     //   }
-    //     // );
-    //     const date = '2024-10-17';
-    //     const availableSlots = {
-    //       '2024-10-17': ['09:00', '10:00', '14:00', '15:00'],
-    //       '2024-10-18': ['11:00', '13:00'],
-    //     };
+      for (let i = 1; i <= 5; i++) {
+        const nextDay = new Date(today);
+        nextDay.setDate(today.getDate() + i);
+        // Format the date as needed (e.g., YYYY-MM-DD)
+        const formattedDate = nextDay.toISOString().split('T')[0];
+        daysArray.push(formattedDate);
+      }
 
-    //     // if (!availableSlots || availableSlots.length === 0) {
-    //     //   return `No available time slots for ${date}.`;
-    //     // }
-    //     const slots = availableSlots[date] || [];
-    //     return `Available time slots for ${date}: ${slots.join(', ')}`;
-    //   } catch (error) {
-    //     return `Error fetching time slots:`;
-    //   }
-    // }
-
-    // client.addTool(
-    //   {
-    //     name: 'fetch_available_dates',
-    //     description:
-    //       'Fetches available dates of blood test booking and returns them to the user.',
-    //     parameters: {},
-    //   },
-    //   async () => {
-    //     try {
-    //       // Mock data representing available dates
-    //       const mockDates = ['2024-10-20', '2024-10-21', '2024-10-22'];
-
-    //       // Return the available dates with their corresponding time slots
-    //       return {
-    //         availableDatesAndSlots: mockDates,
-    //       };
-    //     } catch (error) {
-    //       console.error('Error fetching available dates and slots:', error);
-    //       throw new Error('Unable to fetch available dates and timeslots');
-    //     }
-    //   }
-    // );
-
-    // client.addTool(
-    //   {
-    //     name: 'fetch_available_dates',
-    //     description:
-    //       'Fetches available dates of blood test booking and returns them to the user.',
-    //     parameters: {},
-    //   },
-    //   async () => {
-    //     try {
-    //       const delay = (ms: any) =>
-    //         new Promise((resolve) => setTimeout(resolve, ms));
-
-    //       // Wait for the delay before returning the mock data
-    //       await delay(3000); // Simulating a 3-second delay
-
-    //       // Mock data representing available dates
-    //       const mockDates = ['2024-10-23', '2024-10-24', '2024-10-25'];
-
-    //       // Return the available dates with their corresponding time slots
-    //       return {
-    //         availableDatesAndSlots: mockDates,
-    //       };
-    //     } catch (error) {
-    //       console.error('Error fetching available dates and slots:', error);
-    //       throw new Error('Unable to fetch available dates and timeslots');
-    //     }
-    //   }
-    // );
+      return daysArray;
+    }
 
     client.addTool(
       {
@@ -523,12 +431,10 @@ export function ConsolePage() {
       },
       async () => {
         try {
-          // Fetching the available dates from the API
-          const response = await axios.get<AvailableDate[]>('');
-
-          return {};
+          const availableDates = getNextFiveDays();
+          return availableDates;
         } catch (error) {
-          console.error('Error fetching available dates and slots:', error);
+          console.error('Error fetching available dates', error);
           throw new Error('Unable to fetch available dates and timeslots');
         }
       }
@@ -554,23 +460,20 @@ export function ConsolePage() {
       },
       async ({ date }: any) => {
         try {
-          // Fetch the available timeslots by making an API call to your backend
-          const response = await fetch(
-            `http://localhost:3000/api/availability/timeslots?available_date=${date}`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            }
-          );
+          const accessToken = process.env.REACT_APP_API_ACCESS_TOKEN || '';
 
-          if (!response.ok) {
-            throw new Error('Failed to fetch available time slots');
-          }
+          const [year, month, day] = date.split('-');
+          const formattedDate = `${day}/${month}/${year}`;
 
-          const data = await response.json();
-          return data.available_timeslots; // Return the available timeslots to the user
+          const apiUrl = `https://sea-turtle-app-fv68w.ondigitalocean.app/api/v1/slots?slot_condition=active&date=${formattedDate}`;
+
+          const response = await axios.get(apiUrl, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+
+          return response.data;
         } catch (error) {
           console.error('Error fetching available time slots:', error);
           throw new Error(
@@ -579,6 +482,52 @@ export function ConsolePage() {
         }
       }
     );
+
+    // client.addTool(
+    //   {
+    //     name: 'fetch_available_timeslots',
+    //     description:
+    //       'Fetches available time slots for a specified date for blood test booking and returns them to the user.',
+    //     parameters: {
+    //       type: 'object',
+    //       properties: {
+    //         date: {
+    //           type: 'string',
+    //           format: 'date',
+    //           description:
+    //             'The date for which to fetch available time slots (YYYY-MM-DD).',
+    //         },
+    //       },
+    //       required: ['date'],
+    //     },
+    //   },
+    //   async ({ date }: any) => {
+    //     try {
+    //       // Fetch the available timeslots by making an API call to your backend
+    //       const response = await fetch(
+    //         `http://localhost:3000/api/availability/timeslots?available_date=${date}`,
+    //         {
+    //           method: 'GET',
+    //           headers: {
+    //             'Content-Type': 'application/json',
+    //           },
+    //         }
+    //       );
+
+    //       if (!response.ok) {
+    //         throw new Error('Failed to fetch available time slots');
+    //       }
+
+    //       const data = await response.json();
+    //       return data.available_timeslots; // Return the available timeslots to the user
+    //     } catch (error) {
+    //       console.error('Error fetching available time slots:', error);
+    //       throw new Error(
+    //         'Unable to fetch available time slots for the specified date'
+    //       );
+    //     }
+    //   }
+    // );
 
     client.addTool(
       {
@@ -595,12 +544,12 @@ export function ConsolePage() {
             booking_date: {
               type: 'string',
               description:
-                'Preferred date for the blood test (format: YYYY-MM-DD)',
+                'Preferred date for the blood test (format: DD-MM-YYYY)',
             },
             booking_timeslot: {
               type: 'string',
               description:
-                'Preferred timeslot for the blood test (format: HH:MM)',
+                'Preferred timeslot for the blood test ([from_time] to [to_time] format: HH:MM)',
             },
             additional_notes: {
               type: 'string',
@@ -663,63 +612,6 @@ export function ConsolePage() {
               'There was a problem processing your booking. Please try again.',
           };
         }
-        // try {
-        //   const response = await axios.post(
-        //     'http://localhost:3000/api/bookings',
-        //     userData
-        //   );
-        //   console.log('Data saved successfully:', response.data);
-        // } catch (error) {
-        //   console.error('Error saving data:', error);
-        // }
-
-        // setExtractedInfo(userData);
-
-        // return { ok: true };
-      }
-    );
-
-    client.addTool(
-      {
-        name: 'get_weather',
-        description:
-          'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
-        parameters: {
-          type: 'object',
-          properties: {
-            lat: {
-              type: 'number',
-              description: 'Latitude',
-            },
-            lng: {
-              type: 'number',
-              description: 'Longitude',
-            },
-            location: {
-              type: 'string',
-              description: 'Name of the location',
-            },
-          },
-          required: ['lat', 'lng', 'location'],
-        },
-      },
-      async ({ lat, lng, location }: { [key: string]: any }) => {
-        setMarker({ lat, lng, location });
-        setCoords({ lat, lng, location });
-        const result = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-        );
-        const json = await result.json();
-        const temperature = {
-          value: json.current.temperature_2m as number,
-          units: json.current_units.temperature_2m as string,
-        };
-        const wind_speed = {
-          value: json.current.wind_speed_10m as number,
-          units: json.current_units.wind_speed_10m as string,
-        };
-        setMarker({ lat, lng, location, temperature, wind_speed });
-        return json;
       }
     );
 
